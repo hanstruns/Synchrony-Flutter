@@ -1,7 +1,7 @@
 // Generado por tool/setup.dart desde config/app.json.
 abstract final class AppConfig {
-  static const serverUrl = "";
-  static const webUrl = "";
+  static const serverUrl = "https://synchrony-enlaza-tu-mente.onrender.com";
+  static const webUrl = "https://hanstruns.github.io/Synchrony-Flutter/";
   static const privacyUrl = "";
   static const supportEmail = "";
   static const testAds = true;
