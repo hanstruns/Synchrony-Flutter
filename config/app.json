@@ -1,7 +1,7 @@
 {
   "application_id": "com.synchrony.enlazatumente",
-  "server_url": "",
-  "web_url": "",
+  "server_url": "https://synchrony-enlaza-tu-mente.onrender.com",
+  "web_url": "https://hanstruns.github.io/Synchrony-Flutter/",
   "privacy_url": "",
   "support_email": "",
   "ads_mode": "test",
