@@ -1,0 +1,9 @@
+{
+  "name": "synchrony-enlaza-tu-mente",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Juego cooperativo en tiempo real para GitHub Pages y Render",
+  "scripts": { "start": "node server.js", "test": "node --test test/*.test.js" },
+  "engines": { "node": ">=22" },
+  "license": "UNLICENSED"
+}

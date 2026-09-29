@@ -1,0 +1,12 @@
+{
+  "application_id": "com.synchrony.enlazatumente",
+  "server_url": "",
+  "web_url": "",
+  "privacy_url": "",
+  "support_email": "",
+  "ads_mode": "test",
+  "android_admob_app_id": "ca-app-pub-3940256099942544~3347511713",
+  "ios_admob_app_id": "ca-app-pub-3940256099942544~1458002511",
+  "android_interstitial_id": "ca-app-pub-3940256099942544/1033173712",
+  "ios_interstitial_id": "ca-app-pub-3940256099942544/4411468910"
+}

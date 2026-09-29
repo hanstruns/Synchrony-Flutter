@@ -1,0 +1,24 @@
+name: synchrony
+description: Synchrony, un juego cooperativo de intuición en tiempo real.
+publish_to: none
+version: 1.0.0+1
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+  flutter: '>=3.38.1'
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  google_mobile_ads: 9.1.0
+  shared_preferences: 2.5.5
+  flutter_secure_storage: 11.2.0
+  url_launcher: ^6.3.2
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icon.png

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#09181d"><meta name="description" content="Un juego cooperativo de intuición. Jugad vuestras cartas en orden y encontrad vuestro ritmo.">
+<title>Synchrony · Enlaza tu Mente</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="styles.css">
+<script src="config.js" defer></script><script src="app.js" defer></script>
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<header class="topbar">
+<a class="brand" href="./" aria-label="Synchrony, inicio"><img src="icon.svg" alt="" width="42" height="42"><span>synchr<span class="brand-o">o</span>ny<small>ENLAZA TU MENTE</small></span></a>
+<div class="header-actions"><span id="connection" class="connection">Encuentra tu ritmo</span><button id="sound" class="icon-button" aria-label="Activar sonido" title="Activar sonido">♪<span id="sound-label"> OFF</span></button><button id="help" class="icon-button" aria-label="Cómo jugar">?</button></div>
+</header>
+<main>
+<section id="home" class="home">
+<div class="intro"><div class="eyebrow"><span></span> UN EQUIPO. UN MISMO LATIDO.</div><h1>No es suerte.<br>Es <em>sincronía.</em></h1><p>Cartas en orden. Mentes conectadas.<br>Sin hablar de números. Solo vuestro instinto.</p>
+<div class="hero-cards" aria-hidden="true"><div class="sample-card sample-a"><span>08</span><b>08</b><i>08</i></div><div class="sample-card sample-b"><span>34</span><b>34</b><i>34</i></div><div class="sample-card sample-c"><span>72</span><b>72</b><i>72</i></div></div>
+<div class="intro-footer"><span>♡ <b>5 vidas</b> compartidas</span><span>↗ <b>Un reto</b> cooperativo</span></div></div>
+<div class="entry-panel"><div class="panel-heading"><span class="mini-orbit">◎</span><div><h2>El siguiente latido eres tú.</h2><p>Elige cómo conectar.</p></div></div>
+<label for="name">Tu nombre</label><input id="name" maxlength="24" autocomplete="nickname" placeholder="¿Cómo te llamas?" required>
+<div class="tabs" role="tablist" aria-label="Tipo de partida"><button role="tab" aria-selected="true" aria-controls="create-panel" id="tab-create" data-tab="create">Crear sala</button><button role="tab" aria-selected="false" aria-controls="join-panel" id="tab-join" data-tab="join">Unirme</button><button role="tab" aria-selected="false" aria-controls="match-panel" id="tab-match" data-tab="match">Online</button></div>
+<form id="create-panel" class="tab-panel" role="tabpanel" aria-labelledby="tab-create"><div class="fields"><div><label for="players">Jugadores</label><input id="players" type="number" inputmode="numeric" min="1" value="2" required></div><div><label for="deck">Cartas de la baraja</label><input id="deck" type="number" inputmode="numeric" min="2" max="100000" value="100" required></div></div><p class="field-note">Tu sala, vuestro ritmo. Las salas privadas no tienen el límite de 8 jugadores.</p><button class="primary" type="submit">Crear partida <span>↗</span></button><div class="panel-foot">Privada · Comparte el código con tu equipo</div></form>
+<form id="join-panel" class="tab-panel" role="tabpanel" aria-labelledby="tab-join" hidden><label for="code">Código de la sala</label><input id="code" class="code-input" maxlength="6" minlength="6" pattern="[a-zA-Z0-9]{6}" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="aB3xY9" required><p class="field-note">6 caracteres. Las mayúsculas y minúsculas son diferentes.</p><button class="primary" type="submit">Enlazarme a la sala <span>↗</span></button></form>
+<form id="match-panel" class="tab-panel" role="tabpanel" aria-labelledby="tab-match" hidden><label for="online-players">Tamaño del equipo</label><select id="online-players"><option value="2">2 jugadores</option><option value="3">3 jugadores</option><option value="4">4 jugadores</option><option value="5">5 jugadores</option><option value="6">6 jugadores</option><option value="7">7 jugadores</option><option value="8">8 jugadores</option></select><p class="field-note">Te conectaremos con otros jugadores que busquen el mismo tamaño de equipo. Baraja de 100 cartas.</p><button class="primary" type="submit">Buscar partida <span>↗</span></button></form>
+<p id="form-error" class="error" role="alert"></p>
+<details class="server-settings"><summary>Conexión al servidor</summary><label for="server-url">Dirección de Render</label><input id="server-url" type="url" placeholder="https://tu-servidor.onrender.com"><button id="save-server" class="secondary" type="button">Guardar conexión</button><small>Solo es necesario configurarla una vez si la web no tiene servidor asignado.</small></details>
+</div>
+</section>
+<section id="room" class="room" hidden>
+<div class="room-heading"><div class="room-identity"><span class="eyebrow" id="room-kind">SALA PRIVADA</span><div><h1 id="room-code"></h1><button id="copy-code" class="chip">Copiar código</button><button id="copy-link" class="chip">Copiar enlace ↗</button></div></div><button id="leave" class="text-button">Salir de la sala ↗</button></div>
+<div class="game-layout"><aside class="crew-panel"><div class="crew-title"><h2>Vuestro círculo</h2><span id="player-count" class="pill"></span></div><div id="players-list" class="players-list"></div><div class="crew-bottom"><span class="small-orbit">◎</span><p>No digáis vuestras cartas.<br>Encontrad el mismo ritmo.</p></div></aside>
+<div class="game-main"><div class="stats"><div><span>RONDA</span><b id="round-label">01</b></div><div class="lives-stat"><span>VIDAS DEL EQUIPO</span><b id="lives" aria-label="5 vidas"></b></div><div class="timer-stat"><span>TIEMPO</span><b id="timer">—</b></div></div>
+<div id="arena" class="arena"><div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="table-caption" id="table-caption">EL CENTRO DE VUESTRA CONEXIÓN</div><div id="table-card" class="table-card empty"><span class="corner top">∞</span><strong>◎</strong><span class="corner bottom">∞</span></div><div id="table-note" class="table-note">Aquí empieza vuestro ritmo.</div><div id="countdown" class="countdown" hidden></div></div>
+<div class="round-progress"><div class="progress-label"><span id="progress-label">Esperando al equipo</span><span id="deck-label">100 cartas</span></div><div class="progress-track"><div id="progress-bar"></div></div></div>
+<div id="status-panel" class="status-panel"><div><h2 id="status-title">Conectando mentes…</h2><p id="status-message">Comparte el código de la sala.</p></div><button id="ready" class="primary">Estoy listo <span>✓</span></button></div>
+<div class="hand-zone"><div class="hand-heading"><h2>Tu mano <span id="hand-count" class="pill">0</span></h2><span id="hand-tip">Solo tú puedes ver estas cartas.</span></div><div id="hand" class="hand"><p class="empty-hand">Las cartas llegarán cuando estéis todos listos.</p></div></div>
+</div></div>
+</section>
+</main>
+<footer class="footer"><span>SYNCHRONY</span><span>Menos palabras. Más conexión.</span></footer>
+<div id="toast" class="toast" role="status" hidden></div>
+<dialog id="help-dialog"><button class="dialog-close" aria-label="Cerrar">×</button><div class="eyebrow">EL ARTE DE ESPERAR</div><h2>Enlaza tu mente.</h2><ol><li>Cada uno recibe <b>1 carta en la primera ronda</b>, 2 en la segunda y así sucesivamente.</li><li>Jugad todas las cartas de <b>menor a mayor</b>. No hay turnos: pulsa la carta cuando creas que ha llegado su momento.</li><li>Si alguien se adelanta a una carta menor, perdéis una de las <b>5 vidas</b> y repetís la ronda con nuevas cartas.</li><li>Todos debéis pulsar <b>Estoy listo</b>. Después, una cuenta atrás de 5 segundos os conecta.</li><li>Superad una ronda jugando al menos el <b>79 % de la baraja</b> para ganar. No hay cartas especiales.</li></ol><p>Cada ronda tiene 5 segundos por carta de la baraja (100 cartas = 8 min 20 s). Las esperas no consumen ese tiempo.</p><p>Una desconexión permite volver durante 30 segundos. Después, se retiran las cartas de esa persona, que podrá seguir como espectador. La sala caduca tras 15 minutos sin acciones de ningún jugador.</p><button class="primary dialog-close-button">Entendido. Conectemos ↗</button></dialog>
+<dialog id="leave-dialog"><h2>¿Abandonar la sala?</h2><p>Si la partida ha empezado, se retirarán tus cartas y dejarás de participar.</p><div class="dialog-actions"><button class="secondary" id="cancel-leave">Seguir aquí</button><button class="primary" id="confirm-leave">Salir</button></div></dialog>
+<noscript>Activa JavaScript para jugar a Synchrony.</noscript>
+</body></html>
