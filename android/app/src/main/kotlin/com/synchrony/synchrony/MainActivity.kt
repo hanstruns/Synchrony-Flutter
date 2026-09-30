@@ -15,6 +15,7 @@ import java.io.File
 
 class MainActivity : FlutterActivity() {
     private var player: MediaPlayer? = null
+    private var musicPlayer: MediaPlayer? = null
     private var feedbackChannel: MethodChannel? = null
     private val vibrator: Vibrator?
         get() = if (Build.VERSION.SDK_INT >= 31) {
@@ -31,6 +32,34 @@ class MainActivity : FlutterActivity() {
         feedbackChannel?.setMethodCallHandler { call, result ->
             try {
                 when (call.method) {
+                    "musicStop" -> { stopMusic(); result.success(null) }
+                    "musicVolume" -> {
+                        val level = (call.arguments as Number).toFloat().coerceIn(0f, 0.5f)
+                        musicPlayer?.setVolume(level, level)
+                        result.success(null)
+                    }
+                    "musicLoad" -> {
+                        val bytes = call.arguments as ByteArray
+                        stopMusic()
+                        val file = File(cacheDir, "synchrony-music.wav")
+                        file.writeBytes(bytes)
+                        val next = MediaPlayer()
+                        musicPlayer = next
+                        next.setAudioAttributes(AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_GAME)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
+                        next.setDataSource(file.absolutePath)
+                        next.isLooping = true
+                        next.setVolume(0f, 0f)
+                        next.setOnErrorListener { failed, _, _ ->
+                            if (musicPlayer === failed) musicPlayer = null
+                            failed.release()
+                            true
+                        }
+                        next.prepare()
+                        next.start()
+                        result.success(null)
+                    }
                     "stop" -> { stopFeedback(); result.success(null) }
                     "play" -> {
                         val cue = call.argument<String>("cue") ?: "card"
@@ -81,7 +110,7 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             } catch (e: Exception) {
-                stopFeedback()
+                if (call.method.startsWith("music")) stopMusic() else stopFeedback()
                 result.error("FEEDBACK_FAILED", e.message, null)
             }
         }
@@ -93,10 +122,16 @@ class MainActivity : FlutterActivity() {
         vibrator?.cancel()
     }
 
-    override fun onPause() { stopFeedback(); super.onPause() }
+    private fun stopMusic() {
+        musicPlayer?.release()
+        musicPlayer = null
+    }
+
+    override fun onPause() { stopMusic(); stopFeedback(); super.onPause() }
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         feedbackChannel?.setMethodCallHandler(null)
         feedbackChannel = null
+        stopMusic()
         stopFeedback()
         super.cleanUpFlutterEngine(flutterEngine)
     }
