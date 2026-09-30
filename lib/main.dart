@@ -13,6 +13,7 @@ import 'models/game_state.dart';
 import 'services/ads_service.dart';
 import 'services/game_connection.dart';
 import 'services/feedback_service.dart';
+import 'services/music_service.dart';
 import 'widgets/playing_card.dart';
 
 const lime = Color(0xffbcf582);
@@ -92,6 +93,9 @@ class _GameAppState extends State<GameApp>
   late final GameConnection game;
   late final AdsService ads;
   final feedback = FeedbackService();
+  final music = MusicService();
+  bool musicEnabled = true;
+  double musicVolume = .22;
   bool foreground = true;
   late final TextEditingController name, server, web;
   final players = TextEditingController(text: '2');
@@ -118,6 +122,11 @@ class _GameAppState extends State<GameApp>
       text: AppConfig.webUrl.isNotEmpty
           ? AppConfig.webUrl
           : widget.prefs.getString('web') ?? '',
+    );
+    musicEnabled = widget.prefs.getBool('music_enabled') ?? true;
+    musicVolume = (widget.prefs.getDouble('music_volume') ?? .22).clamp(
+      0.0,
+      .5,
     );
     sound = widget.prefs.getBool('sound') ?? false;
     vibration = widget.prefs.getBool('vibration') ?? true;
@@ -153,16 +162,28 @@ class _GameAppState extends State<GameApp>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(game.restore());
       unawaited(ads.initialize());
+      _syncMusic();
     });
   }
 
+  void _syncMusic() {
+    music.update(
+      track: MusicService.trackForPhase(game.state?.phase),
+      enabled: musicEnabled,
+      active: foreground && !ads.showing && !finishing,
+      volume: musicVolume,
+    );
+  }
+
   void _adsChanged() {
+    _syncMusic();
     if (mounted) setState(() {});
   }
 
   void _changed() {
     if (!mounted) return;
     final s = game.state;
+    _syncMusic();
     if (s != null) {
       if (lastRoom != s.adKey) {
         lastRoom = s.adKey;
@@ -223,6 +244,7 @@ class _GameAppState extends State<GameApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     foreground = state == AppLifecycleState.resumed;
+    _syncMusic();
     if (!foreground) unawaited(feedback.stop());
     // Un anuncio es una transición nativa; no se inicia otra conexión debajo de él.
     if (ads.showing || finishing) return;
@@ -307,12 +329,16 @@ class _GameAppState extends State<GameApp>
     final result = game.state;
     if (result == null) return;
     setState(() => finishing = true);
+    _syncMusic();
     // Cerrar la sesión ANTES del anuncio evita cambios de sala o desconexiones durante su reproducción.
     await game.leave();
     try {
       await ads.showForResult(result);
     } finally {
-      if (mounted) setState(() => finishing = false);
+      if (mounted) {
+        setState(() => finishing = false);
+        _syncMusic();
+      }
     }
   }
 
@@ -342,6 +368,35 @@ class _GameAppState extends State<GameApp>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Música de fondo'),
+                    subtitle: const Text('Instrumental · sin voces'),
+                    value: musicEnabled,
+                    onChanged: (v) {
+                      setState(() => musicEnabled = v);
+                      update(() {});
+                      unawaited(widget.prefs.setBool('music_enabled', v));
+                      _syncMusic();
+                    },
+                  ),
+                  Slider(
+                    value: musicVolume,
+                    min: 0,
+                    max: .5,
+                    label: '${(musicVolume * 100).round()} %',
+                    semanticFormatterCallback: (v) =>
+                        'Volumen de música ${(v * 100).round()} por ciento',
+                    onChanged: musicEnabled
+                        ? (v) {
+                            setState(() => musicVolume = v);
+                            update(() {});
+                            _syncMusic();
+                          }
+                        : null,
+                    onChangeEnd: (v) =>
+                        unawaited(widget.prefs.setDouble('music_volume', v)),
+                  ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Sonidos'),
@@ -444,7 +499,7 @@ class _GameAppState extends State<GameApp>
                   Text(
                     AppConfig.testAds
                         ? 'Versión de prueba · publicidad de prueba'
-                        : 'Synchrony · 1.0.1',
+                        : 'Synchrony · 1.0.2',
                     style: const TextStyle(fontSize: 12, color: muted),
                   ),
                 ],
@@ -1363,6 +1418,7 @@ class _GameAppState extends State<GameApp>
     game.dispose();
     ads.dispose();
     feedback.dispose();
+    music.dispose();
     breathing.dispose();
     celebration.dispose();
     for (final c in [name, server, web, players, deck, code]) {
