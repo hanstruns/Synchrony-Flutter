@@ -110,6 +110,12 @@ abstract final class AppConfig {
         '<uses-permission android:name="android.permission.INTERNET"/>\n    <application',
       );
     }
+    if (!android.contains('android.permission.VIBRATE')) {
+      android = android.replaceFirst(
+        '<application',
+        '<uses-permission android:name="android.permission.VIBRATE"/>\n    <application',
+      );
+    }
     android = android.replaceAll(
       RegExp(r'android:label="[^"]*"'),
       'android:label="Synchrony"',
@@ -204,13 +210,15 @@ android {
     ).listSync(recursive: true).whereType<File>()) {
       if (f.path.endsWith('MainActivity.kt')) {
         f.writeAsStringSync(
-          f.readAsStringSync().replaceFirst(
-            RegExp(r'package [^\n]+'),
-            'package $id',
-          ),
+          File(
+            'tool/native/MainActivity.kt',
+          ).readAsStringSync().replaceAll('SYNCHRONY_PACKAGE', id),
         );
       }
     }
+    File(
+      'tool/native/AppDelegate.swift',
+    ).copySync('ios/Runner/AppDelegate.swift');
     final plist = File('ios/Runner/Info.plist');
     var ios = plist.readAsStringSync();
     void stringKey(String key, String value) {

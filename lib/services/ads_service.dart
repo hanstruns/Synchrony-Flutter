@@ -17,6 +17,38 @@ class AdsService extends ChangeNotifier {
   bool privacyRequired = false, showing = false, _disposed = false;
   int _consentEpoch = 0;
   DateTime? _lastAttempt;
+  String status = 'Sin iniciar';
+  Timer? _retryTimer;
+  void _status(String value) {
+    status = value;
+    _notify();
+  }
+
+  Future<void> retry() async {
+    if (_disposed || _loading || _initializing || showing) return;
+    _retryTimer?.cancel();
+    _lastAttempt = null;
+    if (_ad != null) {
+      _status('Listo para el final de la partida');
+      return;
+    }
+    if (_initialized) {
+      await preload();
+    } else {
+      await initialize();
+    }
+  }
+
+  void _retryLater() {
+    _retryTimer?.cancel();
+    if (!_disposed) {
+      _retryTimer = Timer(
+        const Duration(seconds: 31),
+        () => unawaited(preload()),
+      );
+    }
+  }
+
   AdsService(this.prefs) {
     gate = AdGate(prefs.getStringList('ad_results') ?? []);
   }
@@ -33,7 +65,12 @@ class AdsService extends ChangeNotifier {
   }
 
   Future<void> initialize() async {
-    if (!supported || _initializing || _disposed) return;
+    if (!supported) {
+      _status('Solo disponible en Android/iOS');
+      return;
+    }
+    if (_initializing || _disposed) return;
+    _status('Inicializando…');
     _initializing = true;
     // La configuración de prueba puede no tener mensajes UMP publicados.
     // Nunca se utiliza esta excepción con unidades publicitarias reales.
@@ -42,27 +79,38 @@ class AdsService extends ChangeNotifier {
       _initializing = false;
       return;
     }
-    ConsentInformation.instance.requestConsentInfoUpdate(
-      ConsentRequestParameters(),
-      () => ConsentForm.loadAndShowConsentFormIfRequired((_) async {
-        await _refreshConsent();
-        _initializing = false;
-      }),
-      (_) async {
-        await _refreshConsent();
-        _initializing = false;
-      },
-    );
+    try {
+      ConsentInformation.instance.requestConsentInfoUpdate(
+        ConsentRequestParameters(),
+        () => ConsentForm.loadAndShowConsentFormIfRequired(
+          (_) => _refreshConsent(),
+        ),
+        (_) => _refreshConsent(),
+      );
+    } catch (error) {
+      _initializing = false;
+      _status('Error de consentimiento: $error');
+    }
   }
 
   Future<void> _refreshConsent() async {
     if (_disposed) return;
-    privacyRequired =
-        await ConsentInformation.instance
-            .getPrivacyOptionsRequirementStatus() ==
-        PrivacyOptionsRequirementStatus.required;
-    if (await ConsentInformation.instance.canRequestAds()) await _enable();
-    _notify();
+    try {
+      privacyRequired =
+          await ConsentInformation.instance
+              .getPrivacyOptionsRequirementStatus() ==
+          PrivacyOptionsRequirementStatus.required;
+      if (await ConsentInformation.instance.canRequestAds()) {
+        await _enable();
+      } else {
+        _status('No disponible: revisar consentimiento de AdMob');
+      }
+    } catch (error) {
+      _status('Error de consentimiento: $error');
+    } finally {
+      _initializing = false;
+      _notify();
+    }
   }
 
   Future<void> _enable() async {
@@ -73,7 +121,8 @@ class AdsService extends ChangeNotifier {
         _initialized = true;
       }
       await preload();
-    } catch (_) {
+    } catch (error) {
+      _status('Error al iniciar el SDK: $error');
       /* Un fallo de publicidad no bloquea el juego. */
     }
   }
@@ -91,6 +140,7 @@ class AdsService extends ChangeNotifier {
       return;
     }
     _loading = true;
+    _status('Cargando…');
     _lastAttempt = DateTime.now();
     final epoch = _consentEpoch;
     try {
@@ -105,14 +155,21 @@ class AdsService extends ChangeNotifier {
               return;
             }
             _ad = ad;
+            _retryTimer?.cancel();
+            _status('Listo para el final de la partida');
           },
-          onAdFailedToLoad: (_) {
+          onAdFailedToLoad: (error) {
             _loading = false;
+            if (_disposed || epoch != _consentEpoch) return;
+            _status('Error ${error.code}: ${error.message}');
+            _retryLater();
           },
         ),
       );
-    } catch (_) {
+    } catch (error) {
       _loading = false;
+      _status('Error de carga: $error');
+      _retryLater();
     }
   }
 
@@ -146,11 +203,12 @@ class AdsService extends ChangeNotifier {
     }
     final done = Completer<void>();
     showing = true;
-    _notify();
+    _status('Mostrando anuncio');
     void finish() {
       ad.dispose();
       showing = false;
-      _notify();
+      _lastAttempt = null;
+      _status('Anuncio cerrado');
       if (!done.isCompleted) done.complete();
       unawaited(preload());
     }
@@ -179,6 +237,7 @@ class AdsService extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _retryTimer?.cancel();
     ++_consentEpoch;
     _ad?.dispose();
     super.dispose();

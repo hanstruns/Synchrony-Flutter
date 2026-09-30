@@ -12,6 +12,7 @@ import 'config.dart';
 import 'models/game_state.dart';
 import 'services/ads_service.dart';
 import 'services/game_connection.dart';
+import 'services/feedback_service.dart';
 import 'widgets/playing_card.dart';
 
 const lime = Color(0xffbcf582);
@@ -90,6 +91,8 @@ class _GameAppState extends State<GameApp>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   late final GameConnection game;
   late final AdsService ads;
+  final feedback = FeedbackService();
+  bool foreground = true;
   late final TextEditingController name, server, web;
   final players = TextEditingController(text: '2');
   final deck = TextEditingController(text: '100');
@@ -138,7 +141,9 @@ class _GameAppState extends State<GameApp>
         );
         if (n != lastCountdown) {
           lastCountdown = n;
-          if (sound) unawaited(SystemSound.play(SystemSoundType.click));
+          if (foreground && !ads.showing) {
+            unawaited(feedback.play('countdown', sound: sound));
+          }
         }
       } else {
         lastCountdown = -1;
@@ -165,24 +170,23 @@ class _GameAppState extends State<GameApp>
       }
       if (lastEvent != s.eventId) {
         if (lastEvent != -1) {
-          if (sound &&
+          if (foreground &&
+              !ads.showing &&
               const [
                 'card',
+                'start',
                 'success',
                 'won',
                 'mistake',
                 'lost',
               ].contains(s.eventType)) {
             unawaited(
-              SystemSound.play(
-                s.eventType == 'mistake' || s.eventType == 'lost'
-                    ? SystemSoundType.alert
-                    : SystemSoundType.click,
+              feedback.play(
+                s.eventType,
+                sound: sound,
+                vibration: vibration && s.eventType != 'card',
               ),
             );
-          }
-          if (vibration && const ['mistake', 'lost'].contains(s.eventType)) {
-            unawaited(HapticFeedback.heavyImpact());
           }
           if (const ['success', 'won'].contains(s.eventType) &&
               !MediaQuery.disableAnimationsOf(context)) {
@@ -203,12 +207,23 @@ class _GameAppState extends State<GameApp>
     setState(() {});
   }
 
+  Future<void> _testFeedback({required bool soundOnly}) async {
+    final error = await feedback.play(
+      'test',
+      sound: soundOnly,
+      vibration: !soundOnly,
+    );
+    if (mounted && error != null) _notice(error);
+  }
+
   void _notice(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    foreground = state == AppLifecycleState.resumed;
+    if (!foreground) unawaited(feedback.stop());
     // Un anuncio es una transición nativa; no se inicia otra conexión debajo de él.
     if (ads.showing || finishing) return;
     if (state == AppLifecycleState.paused ||
@@ -335,6 +350,7 @@ class _GameAppState extends State<GameApp>
                       setState(() => sound = v);
                       update(() {});
                       unawaited(widget.prefs.setBool('sound', v));
+                      if (v) unawaited(_testFeedback(soundOnly: true));
                     },
                   ),
                   SwitchListTile(
@@ -345,7 +361,43 @@ class _GameAppState extends State<GameApp>
                       setState(() => vibration = v);
                       update(() {});
                       unawaited(widget.prefs.setBool('vibration', v));
+                      if (v) unawaited(_testFeedback(soundOnly: false));
                     },
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () => _testFeedback(soundOnly: true),
+                        icon: const Icon(Icons.volume_up),
+                        label: const Text('Probar sonido'),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => _testFeedback(soundOnly: false),
+                        icon: const Icon(Icons.vibration),
+                        label: const Text('Probar vibración'),
+                      ),
+                    ],
+                  ),
+                  const Text(
+                    'Sube el volumen multimedia. En iPhone, desactiva el modo silencio. La vibración requiere un móvil compatible y estar permitida en sus ajustes.',
+                    style: TextStyle(fontSize: 12, color: muted),
+                  ),
+                  ListenableBuilder(
+                    listenable: ads,
+                    builder: (context, child) => Column(
+                      children: [
+                        const SizedBox(height: 12),
+                        Text(
+                          'Anuncios ${AppConfig.testAds ? "de prueba" : "reales"}: ${ads.status}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        TextButton(
+                          onPressed: () => ads.retry(),
+                          child: const Text('Volver a cargar anuncio'),
+                        ),
+                      ],
+                    ),
                   ),
                   if (!game.hasSession &&
                       (kDebugMode || AppConfig.serverUrl.isEmpty)) ...[
@@ -392,7 +444,7 @@ class _GameAppState extends State<GameApp>
                   Text(
                     AppConfig.testAds
                         ? 'Versión de prueba · publicidad de prueba'
-                        : 'Synchrony · 1.0.0',
+                        : 'Synchrony · 1.0.1',
                     style: const TextStyle(fontSize: 12, color: muted),
                   ),
                 ],
@@ -1294,7 +1346,7 @@ class _GameAppState extends State<GameApp>
               deck: s.deck,
               enabled: game.connected && !game.busy && s.canPlay,
               onTap: () {
-                if (vibration) HapticFeedback.selectionClick();
+                unawaited(feedback.play('card', vibration: vibration));
                 game.action('play', card: s.hand[index]);
               },
             ),
@@ -1310,6 +1362,7 @@ class _GameAppState extends State<GameApp>
     ads.removeListener(_adsChanged);
     game.dispose();
     ads.dispose();
+    feedback.dispose();
     breathing.dispose();
     celebration.dispose();
     for (final c in [name, server, web, players, deck, code]) {
